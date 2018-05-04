@@ -8,4 +8,5 @@ void test(){
 
 int main(){
   printf("function at %p\n", test);
+  test();
 }

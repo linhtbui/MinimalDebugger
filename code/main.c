@@ -13,6 +13,7 @@
 #include <stdarg.h>
 
 #include "breakpoints.h"
+#include "dump-lines.cc"
 
 int main(int argc, char** argv){
   
@@ -43,7 +44,7 @@ int main(int argc, char** argv){
     struct user_regs_struct *regs = (struct user_regs_struct*)malloc(sizeof(struct user_regs_struct));
     ptrace(PTRACE_GETREGS, pid, 0, regs);
 
-    debug_breakpoint_t* bp = create_breakpoint(pid, (void*)regs->rip);
+    debug_breakpoint_t* bp = create_breakpoint(pid, (void*)0x6f0);
     procmsg("breakpoint created.\n");
     ptrace(PTRACE_CONT, pid, 0, 0);
     wait(0);  
