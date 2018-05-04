@@ -13,11 +13,13 @@
 #include <stdarg.h>
 
 #include "breakpoints.h"
-#include "dump-lines.cc"
+
+void print_lines(int argc, char** argv);
 
 int main(int argc, char** argv){
   
   pid_t pid;
+  print_lines(argc, argv);
 
   if(argc < 2){
     fprintf(stderr, "Help: ./grinnellDBG $PROGRAM $PARAMS p_1, p_2, ..., p_n\n");
