@@ -3,21 +3,21 @@
 #include <fcntl.h>
 #include <inttypes.h>
 
-char* dump_line_table(const dwarf::line_table &lt, int target)
+void* dump_line_table(const dwarf::line_table &lt, int target)
 {
   for (auto &line : lt) {
     if (line.end_sequence){
       printf("line out of bounds\n");
       return NULL;
     }else if(line.line >= target){
-      return (char*) line.address;
+      return (void*) line.address;
     }
   }
   return NULL;
 }
 
 extern "C" {
-  char* print_lines(char* file, int line_num)
+  void* print_lines(char* file, int line_num)
   {
 
     int fd = open(file, O_RDONLY);

@@ -13,8 +13,9 @@
 #include <errno.h>
 #include <stdarg.h>
 #include "breakpoints.h"
+#include <stdint.h>
 
-char* print_lines(char* file, int line_num);
+void* print_lines(char* file, int line_num);
 
 int main(int argc, char** argv){
   
@@ -74,17 +75,23 @@ int main(int argc, char** argv){
     printf("Set a breakpoint");
 
     int target = (int)getchar() - 48;
-
-    int i = 0;
-
-    void* full_addr = malloc(500); 
-    sscanf("0x", "%p", full_addr);
-    sscanf(offset, "%p", full_addr);
-    char* line_addr = print_lines(argv[1], target);
-    sscanf(line_addr, "%p", full_addr);
-        
-    debug_breakpoint_t* bp = create_breakpoint(pid, full_addr); 
-    procmsg("breakpoint created at 0x%s%03x\n", offset, full_addr);
+    void* line_addr = print_lines(argv[1], target);
+    char line[128];
+    sprintf(line, "%p\n", line_addr);
+    memmove(line,line+1, strlen(line));
+    memmove(line,line+1, strlen(line));
+    printf ("line: %s\n", line);
+    
+    char full_addr[50];
+    sprintf(full_addr,"0x%s%s",offset,line);
+    printf ("full: %s\n", full_addr);
+    
+    unsigned long addr;
+    sscanf(full_addr, "%lx", &addr);
+    void* final_addr = (void*) (uintptr_t) addr;
+    
+    debug_breakpoint_t* bp = create_breakpoint(pid, final_addr); 
+    procmsg("breakpoint created at %lx\n", final_addr);
     ptrace(PTRACE_CONT, pid, 0, 0);
     wait(0);  
 
@@ -92,7 +99,7 @@ int main(int argc, char** argv){
       procmsg("child stopped at breakpoint. EIP = 0x%08X\n", get_child_eip(pid));
       procmsg("resuming...\n");
       int rc = resume_from_breakpoint(pid, bp);
-
+      printf("rc: %d\n", rc);
       if(rc == 0){
         procmsg("Child exited\n");
         break;
