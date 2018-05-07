@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <time.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -11,15 +12,13 @@
 #include <sys/user.h>
 #include <errno.h>
 #include <stdarg.h>
-
 #include "breakpoints.h"
 
-void print_lines(int argc, char** argv);
+char* print_lines(char* file, int line_num);
 
 int main(int argc, char** argv){
   
   pid_t pid;
-  print_lines(argc, argv);
 
   if(argc < 2){
     fprintf(stderr, "Help: ./grinnellDBG $PROGRAM $PARAMS p_1, p_2, ..., p_n\n");
@@ -40,14 +39,52 @@ int main(int argc, char** argv){
     }
   }else if(pid > 0){
     // in the parent process (Debugger)
+
+    sleep(1);    
+
+    char* path = (char*)malloc(sizeof(char)*18 + 1);
+    strcpy(path, "/proc/");
+    char pid_str[7];
+    sprintf(pid_str, "%ld", (long) pid); 
+    strcat(path, pid_str);
+    strcat(path, "/maps");
+    printf("path: %s\n", path);
+    FILE *proc_maps = fopen(path, "r");
+    if(proc_maps == NULL){
+      fprintf(stderr, "file open failed: %s\n", strerror(errno));
+      exit(2);
+    }
+
+    char offset[10];
+    if(fgets(offset, 10, proc_maps) == NULL){
+      fprintf(stderr, "fgets failed\n");
+      exit(2);  
+    }
+    printf("offset: %s\n", offset);
     wait(0);
+
     procmsg("child now at RIP = 0x%08x\n", get_child_eip(pid));
     
     struct user_regs_struct *regs = (struct user_regs_struct*)malloc(sizeof(struct user_regs_struct));
     ptrace(PTRACE_GETREGS, pid, 0, regs);
+    
+    printf("main: 0x%08x\n", main);
+        
+    printf("RIP: 0x%08x\n", regs->rip);
+    printf("Set a breakpoint");
 
-    debug_breakpoint_t* bp = create_breakpoint(pid, (void*)0x6f0);
-    procmsg("breakpoint created.\n");
+    int target = (int)getchar() - 48;
+
+    int i = 0;
+
+    void* full_addr = malloc(500); 
+    sscanf("0x", "%p", full_addr);
+    sscanf(offset, "%p", full_addr);
+    char* line_addr = print_lines(argv[1], target);
+    sscanf(line_addr, "%p", full_addr);
+        
+    debug_breakpoint_t* bp = create_breakpoint(pid, full_addr); 
+    procmsg("breakpoint created at 0x%s%03x\n", offset, full_addr);
     ptrace(PTRACE_CONT, pid, 0, 0);
     wait(0);  
 

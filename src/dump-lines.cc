@@ -3,29 +3,27 @@
 #include <fcntl.h>
 #include <inttypes.h>
 
-void dump_line_table(const dwarf::line_table &lt)
+char* dump_line_table(const dwarf::line_table &lt, int target)
 {
   for (auto &line : lt) {
-    if (line.end_sequence)
-      printf("\n");
-    else
-      printf("%-40s%8d%#20" PRIx64 "\n", line.file->path.c_str(),
-             line.line, line.address);
+    if (line.end_sequence){
+      printf("line out of bounds\n");
+      return NULL;
+    }else if(line.line >= target){
+      return (char*) line.address;
+    }
   }
+  return NULL;
 }
 
 extern "C" {
-  void print_lines(int argc, char **argv)
+  char* print_lines(char* file, int line_num)
   {
-    if (argc != 2) {
-      fprintf(stderr, "usage: %s elf-file\n", argv[0]);
-      return;
-    }
 
-    int fd = open(argv[1], O_RDONLY);
+    int fd = open(file, O_RDONLY);
     if (fd < 0) {
-      fprintf(stderr, "%s: %s\n", argv[1], strerror(errno));
-      return;
+      fprintf(stderr, "%s: %s\n", file, strerror(errno));
+      return NULL;
     }
 
     elf::elf ef(elf::create_mmap_loader(fd));
@@ -33,10 +31,9 @@ extern "C" {
 
     for (auto cu : dw.compilation_units()) {
       printf("--- <%x>\n", (unsigned int)cu.get_section_offset());
-      dump_line_table(cu.get_line_table());
-      printf("\n");
+      return dump_line_table(cu.get_line_table(), line_num);
     }
 
-    return;
+    return NULL;
   }
 }
