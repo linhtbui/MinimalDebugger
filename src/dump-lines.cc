@@ -10,6 +10,7 @@ void* dump_line_table(const dwarf::line_table &lt, int target)
       printf("line out of bounds\n");
       return NULL;
     }else if(line.line >= target){
+      printf("line: %d target: %d\n", line.line, target);
       return (void*) line.address;
     }
   }

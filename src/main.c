@@ -64,17 +64,11 @@ int main(int argc, char** argv){
     printf("offset: %s\n", offset);
     wait(0);
 
-    procmsg("child now at RIP = 0x%08x\n", get_child_eip(pid));
+    procmsg("child now at EIP = 0x%08x\n", get_child_eip(pid));
     
-    struct user_regs_struct *regs = (struct user_regs_struct*)malloc(sizeof(struct user_regs_struct));
-    ptrace(PTRACE_GETREGS, pid, 0, regs);
-    
-    printf("main: 0x%08x\n", main);
-        
-    printf("RIP: 0x%08x\n", regs->rip);
-    printf("Set a breakpoint");
-
-    int target = (int)getchar() - 48;
+    printf("Set a breakpoint\n");
+    int target = 0;
+    scanf("%d", &target);
     void* line_addr = print_lines(argv[1], target);
     char line[128];
     sprintf(line, "%p\n", line_addr);
@@ -89,9 +83,8 @@ int main(int argc, char** argv){
     unsigned long addr;
     sscanf(full_addr, "%lx", &addr);
     void* final_addr = (void*) (uintptr_t) addr;
-    
     debug_breakpoint_t* bp = create_breakpoint(pid, final_addr); 
-    procmsg("breakpoint created at %lx\n", final_addr);
+    procmsg("breakpoint created at %lx\n", final_addr, bp->addr);
     ptrace(PTRACE_CONT, pid, 0, 0);
     wait(0);  
 
@@ -114,7 +107,6 @@ int main(int argc, char** argv){
     }
     
     cleanup_breakpoint(bp);
-
     /*
     int status;
     wait(&status);

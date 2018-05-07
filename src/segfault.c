@@ -2,11 +2,10 @@
 #include <stdlib.h>
 #include <signal.h>
 
-void test(){
-  printf("in TEST\n");
-}
-
 int main(){
-  printf("function at %p\n", test);
-  test();
+  printf("1\n");
+  printf("2\n");
+  printf("3\n");
+  printf("4\n");
+  
 }
