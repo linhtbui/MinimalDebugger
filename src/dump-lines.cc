@@ -10,7 +10,6 @@ void* dump_line_table(const dwarf::line_table &lt, int target)
       printf("line out of bounds\n");
       return NULL;
     }else if(line.line >= target){
-      printf("line: %d target: %d\n", line.line, target);
       return (void*) line.address;
     }
   }
@@ -31,10 +30,45 @@ extern "C" {
     dwarf::dwarf dw(dwarf::elf::create_loader(ef));
 
     for (auto cu : dw.compilation_units()) {
-      printf("--- <%x>\n", (unsigned int)cu.get_section_offset());
       return dump_line_table(cu.get_line_table(), line_num);
     }
 
     return NULL;
+  }
+}
+
+int dump_line_address(const dwarf::line_table &lt, unsigned target)
+{
+  int realline = 0;
+  for (auto &line : lt) {
+    if (line.end_sequence){
+      printf("line out of bounds\n");
+      return -1;
+    }else if(line.address > target){
+      return realline;
+    }
+    realline = line.line;
+  }
+  return -1;
+}
+
+extern "C" {
+  int get_line(char* file,  unsigned address)
+  {
+
+    int fd = open(file, O_RDONLY);
+    if (fd < 0) {
+      fprintf(stderr, "%s: %s\n", file, strerror(errno));
+      return -1;
+    }
+
+    elf::elf ef(elf::create_mmap_loader(fd));
+    dwarf::dwarf dw(dwarf::elf::create_loader(ef));
+
+    for (auto cu : dw.compilation_units()) {
+      return dump_line_address(cu.get_line_table(), address);
+    }
+
+    return -1;
   }
 }

@@ -11,7 +11,32 @@
 #include <sys/user.h>
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
 
+int get_line(char* file,  unsigned address);
+
+void segfault_handler(pid_t pid, char* filepath){
+  struct user_regs_struct regs;
+  ptrace(PTRACE_GETREGS, pid, 0, &regs);
+  printf("segmentation fault occured on line number: %d\n", get_line(filepath, (regs.rip & 0x000000000FFF)));
+  unsigned data = ptrace(PTRACE_PEEKTEXT, pid, regs.rip, 0);
+  char line[500];
+  sprintf(line, "%s", data);
+  printf("LINE: %s\n", line);
+  kill(pid, SIGKILL);
+  exit(1);
+}
+
+void run_target(char* path, char** args)
+{
+
+    ptrace(PTRACE_TRACEME, NULL, NULL, NULL);
+    
+    if(execvp(path, args) == -1){
+      fprintf(stderr, "exec failed");
+      exit(2);
+    }
+}
 
 /* Print a message to stdout, prefixed by the process ID
 */
@@ -48,10 +73,13 @@ typedef struct debug_breakpoint {
  void enable_breakpoint(pid_t pid, debug_breakpoint_t* bp)
 {
     assert(bp);
-    bp->orig_data = ptrace(PTRACE_PEEKTEXT, pid, bp->addr, 0);
     ptrace(PTRACE_POKETEXT, pid, bp->addr, (bp->orig_data & 0xFFFFFF00) | 0xCC);
 }
 
+ void enable_breakpoint_2(pid_t pid, debug_breakpoint_t* bp)
+{
+    assert(bp);
+}
 
 /* Disable the given breakpoint by replacing the byte it points to with
 ** the original byte that was there before trap insertion.
@@ -61,7 +89,7 @@ void disable_breakpoint(pid_t pid, debug_breakpoint_t* bp)
   assert(bp);
   unsigned data = ptrace(PTRACE_PEEKTEXT, pid, bp->addr, 0);
   assert((data & 0xFF) == 0xCC);
-  ptrace(PTRACE_POKETEXT, pid, bp->addr, (data & 0xFFFFFF00) | (bp->orig_data & 0xFF));
+  ptrace(PTRACE_POKETEXT, pid, bp->addr, bp->orig_data);
   data = ptrace(PTRACE_PEEKTEXT, pid, bp->addr, 0);
   assert((data & 0xFF) != 0xCC);
 }
@@ -71,6 +99,7 @@ debug_breakpoint_t* create_breakpoint(pid_t pid, void* addr)
 {
     debug_breakpoint_t* bp = malloc(sizeof(*bp));
     bp->addr = addr;
+    bp->orig_data = ptrace(PTRACE_PEEKTEXT, pid, bp->addr, 0);
     enable_breakpoint(pid, bp);
     return bp;
 }
@@ -82,7 +111,7 @@ void cleanup_breakpoint(debug_breakpoint_t* bp)
 }
 
 
-int resume_from_breakpoint(pid_t pid, debug_breakpoint_t* bp)
+int resume_from_breakpoint(pid_t pid, debug_breakpoint_t* bp, char* filepath)
 {
     struct user_regs_struct regs;
     int wait_status;
@@ -97,22 +126,32 @@ int resume_from_breakpoint(pid_t pid, debug_breakpoint_t* bp)
     regs.rip = (long) bp->addr;
     ptrace(PTRACE_SETREGS, pid, 0, &regs);
     disable_breakpoint(pid, bp);
-     if (ptrace(PTRACE_SINGLESTEP, pid, 0, 0) < 0) {
-        perror("ptrace");
-       return -1;
+    if (ptrace(PTRACE_SINGLESTEP, pid, 0, 0) < 0) {
+      perror("ptrace");
+      return -1;
     }
     wait(&wait_status);
+    siginfo_t data;
 
     if (WIFEXITED(wait_status)) {
        return 0;
     }
     // Re-enable the breakpoint and let the process run.
-    enable_breakpoint(pid, bp);
+     enable_breakpoint_2(pid, bp);
     if (ptrace(PTRACE_CONT, pid, 0, 0) < 0) {
         perror("ptrace");
         return -1;
     }
     wait(&wait_status);
+
+    if (WIFSTOPPED(wait_status)){
+      printf("Program has stopped\n");
+      ptrace(PTRACE_GETSIGINFO, pid, 0, &data) ;
+      if (data.si_signo == SIGSEGV){
+        printf("It has stopped because of a segmentation fault\n");
+        segfault_handler(pid, filepath);
+      }
+    }
     if (WIFEXITED(wait_status))
       return 0;
     else if (WIFSTOPPED(wait_status)) {
