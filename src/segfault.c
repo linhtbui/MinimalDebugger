@@ -8,7 +8,7 @@ int main(){
   printf("1\n");
   printf("2\n");
   printf("3\n");
-  char* s = NULL;
+  char arr[3];
   printf("4\n");
-  s[0] = 2;
+  arr[7000] = 'a';
 }

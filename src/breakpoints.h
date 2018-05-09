@@ -19,10 +19,8 @@ void segfault_handler(pid_t pid, char* filepath){
   struct user_regs_struct regs;
   ptrace(PTRACE_GETREGS, pid, 0, &regs);
   printf("segmentation fault occured on line number: %d\n", get_line(filepath, (regs.rip & 0x000000000FFF)));
+  printf("RIP: %p\n", regs.rip);
   unsigned data = ptrace(PTRACE_PEEKTEXT, pid, regs.rip, 0);
-  char line[500];
-  sprintf(line, "%s", data);
-  printf("LINE: %s\n", line);
   kill(pid, SIGKILL);
   exit(1);
 }
