@@ -7,8 +7,8 @@
 int main(){
   printf("1\n");
   printf("2\n");
+  int *p = NULL;
   printf("3\n");
-  char arr[3];
+  *p = 3;
   printf("4\n");
-  arr[7000] = 'a';
 }
