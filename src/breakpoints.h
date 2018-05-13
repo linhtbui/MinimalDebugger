@@ -29,8 +29,15 @@ typedef struct proc_maps{
 
 int get_line(char* file,  unsigned address);
 
+void push(proc_maps_t** node, addr_info_t* data){
+  proc_maps_t* temp = (proc_maps_t*)malloc(sizeof(void*) * 2);
+  temp->data = data;
+  temp->next = *node;
+  *node = temp;
+}
+
 void segfault_handler(pid_t pid, char* filepath){
-  
+
   char* path = (char*)malloc(sizeof(char)*18 + 1);
   strcpy(path, "/proc/");
   char pid_str[7];
@@ -43,81 +50,92 @@ void segfault_handler(pid_t pid, char* filepath){
     exit(2); 
   }
 
-  char *line = NULL; 
-  proc_maps_t* current = NULL;
-  size_t *line_size;
-  *line_size = 31;
-  proc_maps_t* proc_info;
-  while(getline(&line, line_size, proc_file) != -1){
-    addr_info_t* mapped_range = (addr_info_t*)malloc(sizeof(addr_info_t));
-    proc_maps_t* maps = (proc_maps_t*)malloc(sizeof(proc_maps_t));
-    
-    if(current != NULL) {
-      current->next = maps;
-    } else {
-      proc_info = maps;
-    }
-    maps->next = NULL;
-    maps->data = mapped_range;
-    current = maps;
-    
-    mapped_range->min_addr = strtok(line, "-"); 
-    mapped_range->max_addr = strtok(NULL, " ");
-    char* permissions = strtok(NULL, " ");
-
-    printf("permissions: %s\n", permissions);
-    
-    if(permissions[0] == 'r'){
-      mapped_range->read_bit = 1;
-    }
-    if(permissions[1] == 'w'){
-      mapped_range->write_bit = 1;
-    }
-    if(permissions[2] == 'x'){
-      mapped_range->execute_bit = 1;  
-    }
-
-  }
-      
-  siginfo_t data;
-  ptrace(PTRACE_GETSIGINFO, pid, 0, &data);
-  if(data.si_addr == NULL){
-    printf("Dereferenced a NULL pointer!\n");
-  }
   struct user_regs_struct regs;
   ptrace(PTRACE_GETREGS, pid, 0, &regs);
   printf("segmentation fault occured on line number: %d\n", get_line(filepath, (regs.rip & 0x000000000FFF)));
-  
-  proc_maps_t* cur = proc_info;
-  int map_bit = 0;
-  // Check if in mapped memory
-  while(cur->next != NULL){
-    void* min;
-    void* max;
-    char full_addr[16];
-    unsigned long min_addr;
-    unsigned long max_addr;
-    sprintf(full_addr, "0x%s", cur->data->min_addr);
-    sscanf(full_addr, "%lx", &min_addr);
-    sprintf(full_addr, "0x%s", cur->data->max_addr);
-    sscanf(full_addr, "%lx", &max_addr);
-    
-    if(regs.rip >= min_addr && regs.rip <= max_addr){
-      map_bit = 1;
-      break; 
+
+  siginfo_t data;
+  ptrace(PTRACE_GETSIGINFO, pid, 0, &data);
+
+  if(data.si_code == SEGV_MAPERR){
+    printf("You tried to access unmapped memory");
+    if(data.si_addr == NULL){
+      printf(", specifically, you dereferenced a NULL pointer on line %d!\n", get_line(filepath, (regs.rip & 0x000000000FFF)));
+    }else{
+      printf("on line %d and address %p.\n", get_line(filepath, (regs.rip & 0x000000000FFF)), data.si_addr);
     }
-    cur = cur->next;
+  }else{
+    char *line = NULL; 
+    proc_maps_t* proc_maps = NULL; 
+    size_t *line_size = (size_t*)malloc(sizeof(size_t));
+    *line_size = 31;
+    while(getline(&line, line_size, proc_file) != -1){
+      addr_info_t* mapped_range = (addr_info_t*)malloc(sizeof(char*)*2 + sizeof(int) * 3);
+      
+      mapped_range->min_addr = strtok(line, "-"); 
+      mapped_range->max_addr = strtok(NULL, " ");
+      char* permissions = strtok(NULL, " ");
+      
+      if(permissions[0] == 'r'){
+        mapped_range->read_bit = 1;
+      }else{
+        mapped_range->read_bit = 0;
+      }
+      if(permissions[1] == 'w'){
+        mapped_range->write_bit = 1;
+      }else{
+        mapped_range->write_bit = 0;
+      }
+      if(permissions[2] == 'x'){
+        mapped_range->execute_bit = 1;  
+      }else{
+        mapped_range->execute_bit = 0;
+      }
+
+      push(&proc_maps, mapped_range);
+      line = NULL;
+    }
+  
+    proc_maps_t* cur = proc_maps;
+    // Check if in mapped memory
+    while(cur != NULL){
+      void* min;
+      void* max;
+      char full_addr[16];
+      unsigned long min_addr;
+      unsigned long max_addr;
+      sprintf(full_addr, "0x%s", cur->data->min_addr);
+      sscanf(full_addr, "%lx", &min_addr);
+      sprintf(full_addr, "0x%s", cur->data->max_addr);
+      sscanf(full_addr, "%lx", &max_addr);
+      min = (void*) (uintptr_t) min_addr;
+      max = (void*) (uintptr_t) max_addr;
+
+         
+      if(data.si_addr >= min && data.si_addr <= max){
+        break; 
+      }
+      cur = cur->next;
+    }
+    printf("The permissions of the memory you tried to access are: '");
+    if(cur->data->read_bit){
+      printf("r");
+    }else{
+      printf("-");
+    }
+    if(cur->data->write_bit){
+      printf("w");
+    }else{
+      printf("-");
+    }
+    if(cur->data->execute_bit){
+      printf("x");
+    }else{
+      printf("-");
+    }
+    printf("'. Look at line %d to see what you did.\n", get_line(filepath, (regs.rip & 0x000000000FFF)));
   }
 
-  printf("map_bit: %d\n", map_bit);
-  if(map_bit){
-    printf("readable: %d\n", cur->data->read_bit);
-    printf("writeable: %d\n", cur->data->write_bit);
-    printf("executable: %d\n", cur->data->execute_bit);
-  }
-      // Check permissions (if in mapped mem)
-  
-  printf("RIP: %p\n", regs.rip);
   kill(pid, SIGKILL);
   exit(1);
 }

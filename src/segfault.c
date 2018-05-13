@@ -7,8 +7,8 @@
 int main(){
   printf("1\n");
   printf("2\n");
-  int *p = NULL;
+  char *string = "hello world\n";
   printf("3\n");
-  *p = 3;
+  string[2] = 'd';
   printf("4\n");
 }

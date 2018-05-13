@@ -17,11 +17,34 @@
 
 void* print_lines(char* file, int line_num);
 void segfault_handler(pid_t pid, char* filepath);
-
+void run_breakpoint(pid_t pid, char* filepath);
 // in the parent process (Debugger)
 void run_debugger(pid_t pid, char* filepath){
   sleep(1);    
+ 
+  printf("Press b to set a breakpoint or c to continue\n");
+  char target = 0;
+  scanf("%c", &target);
 
+  if(target == 'b'){
+    run_breakpoint(pid, filepath);
+  }else{
+    ptrace(PTRACE_CONT, pid, 0, 0);
+    int wait_status;
+    wait(&wait_status);
+    siginfo_t data;
+    if (WIFSTOPPED(wait_status)){
+      printf("Program has stopped\n");
+      ptrace(PTRACE_GETSIGINFO, pid, 0, &data) ;
+      if (data.si_signo == SIGSEGV){
+        printf("It has stopped because of a segmentation fault\n");
+        segfault_handler(pid, filepath);
+      }
+    }
+  }
+}
+
+void run_breakpoint(pid_t pid, char* filepath){
   char* path = (char*)malloc(sizeof(char)*18 + 1);
   strcpy(path, "/proc/");
   char pid_str[7];
@@ -40,9 +63,6 @@ void run_debugger(pid_t pid, char* filepath){
     exit(2);  
   }
   wait(0);
-
-  procmsg("child now at EIP = 0x%08x\n", get_child_eip(pid));
-    
   printf("Set a breakpoint\n");
   int target = 0;
   scanf("%d", &target);
@@ -53,8 +73,7 @@ void run_debugger(pid_t pid, char* filepath){
   memmove(line,line+1, strlen(line));
     
   char full_addr[50];
-  sprintf(full_addr,"0x%s%s",offset,line);
-  printf ("full: %s\n", full_addr);
+  sprintf(full_addr,"0x%s%s",offset,line);;
   unsigned long addr;
   sscanf(full_addr, "%lx", &addr);
   void* final_addr = (void*) (uintptr_t) addr;
@@ -71,14 +90,13 @@ void run_debugger(pid_t pid, char* filepath){
       segfault_handler(pid, filepath);
     }
   }
-  procmsg("child stopped at breakpoint. EIP = 0x%08X\n", get_child_eip(pid));
+  printf("program has stopped at breakpoint\n");
   printf("Type c to continue\n");
   char buffer = 'a';
   scanf("%c\n", &buffer); 
   while(1){
-    procmsg("resuming...\n");
+    printf("resuming...\n");
     int rc = resume_from_breakpoint(pid, bp, filepath);
-    printf("rc: %d\n", rc);
     if(rc == 0){
       procmsg("Child exited\n");
       break;
