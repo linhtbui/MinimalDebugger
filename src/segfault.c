@@ -5,10 +5,8 @@
 
 
 int main(){
-  printf("1\n");
-  printf("2\n");
-  char *string = "hello world\n";
-  printf("3\n");
-  string[2] = 'd';
-  printf("4\n");
+  int n[5];
+  for(int i = 0; i < 100000; i++){
+    n[i] = i;
+  }
 }

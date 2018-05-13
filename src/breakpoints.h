@@ -62,7 +62,7 @@ void segfault_handler(pid_t pid, char* filepath){
     if(data.si_addr == NULL){
       printf(", specifically, you dereferenced a NULL pointer on line %d!\n", get_line(filepath, (regs.rip & 0x000000000FFF)));
     }else{
-      printf("on line %d and address %p.\n", get_line(filepath, (regs.rip & 0x000000000FFF)), data.si_addr);
+      printf(" on line %d and address %p.\n", get_line(filepath, (regs.rip & 0x000000000FFF)), data.si_addr);
     }
   }else{
     char *line = NULL; 
@@ -126,6 +126,7 @@ void segfault_handler(pid_t pid, char* filepath){
     if(cur->data->write_bit){
       printf("w");
     }else{
+
       printf("-");
     }
     if(cur->data->execute_bit){
