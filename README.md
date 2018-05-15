@@ -6,16 +6,19 @@ A minimal deubgger that catches segmentation faults and provides useful informat
 Usage:
 `./gdb ./[program]` where program is the program to be debugged. For example, run `make` in the src directory and then `./gdb ./seg`
 
+# Library Dependencies
+`libelfin` which can be found at https://github.com/aclements/libelfin
+
 # Resources Used:
-http://system.joekain.com/debugger/
+* http://system.joekain.com/debugger/
 <br/>
-http://t-a-w.blogspot.com/2007/03/how-to-code-debuggers.html
+* http://t-a-w.blogspot.com/2007/03/how-to-code-debuggers.html
 <br/>
-https://blog.tartanllama.xyz/writing-a-linux-debugger-setup/
+* https://blog.tartanllama.xyz/writing-a-linux-debugger-setup/
 <br/>
-https://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1/
+* https://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1/
 <br/>
-https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints/
+* https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints/
 <br/>
-https://eli.thegreenplace.net/2011/02/07/how-debuggers-work-part-3-debugging-information
+* https://eli.thegreenplace.net/2011/02/07/how-debuggers-work-part-3-debugging-information
 <br/>
