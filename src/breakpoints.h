@@ -197,6 +197,9 @@ void segfault_handler(pid_t pid, char* filepath){
   exit(1);
 }
 
+
+// This command executes the debuggee code, while allowing
+// the parent to trace it with PTRACE_TRACEME
 void run_target(char* path, char** args)
 {
 
@@ -219,7 +222,7 @@ void procmsg(const char* format, ...)
     va_end(ap);
 }
 
-
+// Returns the instruction pointer of the child
 long get_child_eip(pid_t pid)
 {
     struct user_regs_struct regs;
@@ -264,7 +267,8 @@ void disable_breakpoint(pid_t pid, debug_breakpoint_t* bp)
   assert((data & 0xFF) != 0xCC);
 }
 
-
+// This function creates a breakpoint in the child <PID> at
+// 'addr'
 debug_breakpoint_t* create_breakpoint(pid_t pid, void* addr)
 {
     debug_breakpoint_t* bp = malloc(sizeof(*bp));
@@ -274,11 +278,13 @@ debug_breakpoint_t* create_breakpoint(pid_t pid, void* addr)
     return bp;
 }
 
-
+// This function deletes the breakpoint, freeing the memory.
 void cleanup_breakpoint(debug_breakpoint_t* bp)
 {
     free(bp);
 }
+
+
 
 
 int resume_from_breakpoint(pid_t pid, debug_breakpoint_t* bp, char* filepath)
