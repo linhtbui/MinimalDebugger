@@ -241,7 +241,7 @@ typedef struct debug_breakpoint {
 
 
 /* Enable the given breakpoint by inserting the trap instruction at its 
-** address, and saving the original data at that location.
+** address
 */
  void enable_breakpoint(pid_t pid, debug_breakpoint_t* bp)
 {
@@ -268,7 +268,7 @@ void disable_breakpoint(pid_t pid, debug_breakpoint_t* bp)
 }
 
 // This function creates a breakpoint in the child <PID> at
-// 'addr'
+// 'addr' and stores the original data for the breakpoint
 debug_breakpoint_t* create_breakpoint(pid_t pid, void* addr)
 {
     debug_breakpoint_t* bp = malloc(sizeof(*bp));
@@ -308,7 +308,7 @@ int resume_from_breakpoint(pid_t pid, debug_breakpoint_t* bp, char* filepath)
     }
     wait(&wait_status);
     siginfo_t data;
-
+    // check if the program finished executing
     if (WIFEXITED(wait_status)) {
        return 0;
     }
@@ -319,16 +319,18 @@ int resume_from_breakpoint(pid_t pid, debug_breakpoint_t* bp, char* filepath)
         return -1;
     }
     wait(&wait_status);
-
+    // check if the program has stopped
     if (WIFSTOPPED(wait_status)){
       printf("Program has stopped\n");
       ptrace(PTRACE_GETSIGINFO, pid, 0, &data) ;
+      // check if it has stopped because of a segmentation fault
       if (data.si_signo == SIGSEGV){
         printf("It has stopped because of a segmentation fault\n");
         // call the segfault handler
         segfault_handler(pid, filepath);
       }
     }
+    // if it has finished executing return 0 otherwise 1 and -1 if an error occured
     if (WIFEXITED(wait_status))
       return 0;
     else if (WIFSTOPPED(wait_status)) {

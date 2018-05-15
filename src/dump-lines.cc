@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 
+// Function to return the address of a given line from the table of lines and addresses
 void* dump_line_table(const dwarf::line_table &lt, int target)
 {
   for (auto &line : lt) {
@@ -17,6 +18,7 @@ void* dump_line_table(const dwarf::line_table &lt, int target)
 }
 
 extern "C" {
+  // Function that stores the lines and addresses of a program into a table and then returns the address of a given line using the dump_line_table function
   void* print_lines(char* file, int line_num)
   {
 

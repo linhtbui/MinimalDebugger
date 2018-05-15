@@ -16,3 +16,6 @@ Usage:
 * https://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1/
 * https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints/
 * https://eli.thegreenplace.net/2011/02/07/how-debuggers-work-part-3-debugging-information
+
+Note: We always worked together on this project so all the commits reflect
+work from all three of us
