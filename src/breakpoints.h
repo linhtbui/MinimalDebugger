@@ -14,6 +14,9 @@
 #include <signal.h>
 #include <stdint.h>
 
+// This struct holds the information for each line within
+// the /proc/<PID>/maps file. That way, we can find out 
+// which regions of mapped memory have which permissions.
 typedef struct addr_info{
   char* min_addr;
   char* max_addr;
@@ -22,13 +25,19 @@ typedef struct addr_info{
   int execute_bit; 
 }addr_info_t;
 
+// This struct allows us to create a linked list for data
+// in the previous struct. 
 typedef struct proc_maps{
   addr_info_t* data;
   struct proc_maps *next;
 }proc_maps_t;
 
+// This function returns the line number in the source code,
+// given the address.
 int get_line(char* file,  unsigned address);
 
+// This function pushes values onto our /proc/<PID>/maps
+// linked list.
 void push(proc_maps_t** node, addr_info_t* data){
   proc_maps_t* temp = (proc_maps_t*)malloc(sizeof(void*) * 2);
   temp->data = data;
@@ -36,8 +45,14 @@ void push(proc_maps_t** node, addr_info_t* data){
   *node = temp;
 }
 
+// This function is called by the debugging process when the
+// child throws a SIGSEGV signal. It does all the reporting of
+// segfault information, then terminates the entire program 
+// (both parent and child).
 void segfault_handler(pid_t pid, char* filepath){
 
+// This code loads the /proc/<PID>/maps file into 'proc_file'
+// for processing.
   char* path = (char*)malloc(sizeof(char)*18 + 1);
   strcpy(path, "/proc/");
   char pid_str[7];
@@ -45,26 +60,55 @@ void segfault_handler(pid_t pid, char* filepath){
   strcat(path, pid_str);
   strcat(path, "/maps");
   FILE *proc_file = fopen(path, "r");
+  
+  // error check
   if(proc_file == NULL){
     fprintf(stderr, "file open failed: %s\n", strerror(errno));
     exit(2); 
   }
 
+  // These two lines load the register values of the child
+  // at the segfault into 'regs', using PTRACE_GETREGS. 
+  // From here, we can extract the instruction pointer to find
+  // the line number that caused the segfault.
   struct user_regs_struct regs;
   ptrace(PTRACE_GETREGS, pid, 0, &regs);
+  
+  // This line prints the line number that caused the segfault,
+  // by passing the instruction pointer into the aforementioned
+  // function, 'get_line()'
   printf("segmentation fault occured on line number: %d\n", get_line(filepath, (regs.rip & 0x000000000FFF)));
-
+  
+  // These two lines load the signal info into 'data', so that we
+  // may find out if the segfault was triggered because of unmapped
+  // memory, dereferencing a NULL pointer, or otherwise.
   siginfo_t data;
   ptrace(PTRACE_GETSIGINFO, pid, 0, &data);
 
+  // This 'if' statement first checks if the segfault was triggered
+  // by an access to unmapped memory.
   if(data.si_code == SEGV_MAPERR){
+    
+    // If it was triggered by unmapped memory, report this to the user.
     printf("You tried to access unmapped memory");
     if(data.si_addr == NULL){
+      // Additionally, if the unmapped memory was a NULL pointer, report this
+      // AND the line number with 'get_line()'
       printf(", specifically, you dereferenced a NULL pointer on line %d!\n", get_line(filepath, (regs.rip & 0x000000000FFF)));
     }else{
+      // Otherwise, simply report to the user that the program tried
+      // access unmapped memory on the line number.
       printf(" on line %d and address %p.\n", get_line(filepath, (regs.rip & 0x000000000FFF)), data.si_addr);
     }
   }else{
+
+    // If the segfault was NOT caused by an access to unmapped memory, then
+    // this 'else' block executes
+
+    // first, we create a linked list of all regions of mapped memory and their
+    // permissions with the aforementioned 'proc_maps_t' and 'addr_info_t' structs.
+    // the purpose of this is to report to the user the permissions,
+    // so that they may understand which permissions violation they made
     char *line = NULL; 
     proc_maps_t* proc_maps = NULL; 
     size_t *line_size = (size_t*)malloc(sizeof(size_t));
@@ -72,10 +116,13 @@ void segfault_handler(pid_t pid, char* filepath){
     while(getline(&line, line_size, proc_file) != -1){
       addr_info_t* mapped_range = (addr_info_t*)malloc(sizeof(char*)*2 + sizeof(int) * 3);
       
+      // extracts minimum and maximum bounds for each region in mapped memory
       mapped_range->min_addr = strtok(line, "-"); 
       mapped_range->max_addr = strtok(NULL, " ");
       char* permissions = strtok(NULL, " ");
       
+      // adds permissions to the 'mapped_range' struct for region
+      // in mapped memory
       if(permissions[0] == 'r'){
         mapped_range->read_bit = 1;
       }else{
@@ -91,13 +138,16 @@ void segfault_handler(pid_t pid, char* filepath){
       }else{
         mapped_range->execute_bit = 0;
       }
-
+      
+      // add 'mapped_range' to 'proc_maps'
       push(&proc_maps, mapped_range);
       line = NULL;
     }
-  
+ 
+    // Next, we compare the address that triggered the segfault
+    // to each region in mapped memory (through our 'proc_maps' 
+    // linked list), to find out the permissions of that address.
     proc_maps_t* cur = proc_maps;
-    // Check if in mapped memory
     while(cur != NULL){
       void* min;
       void* max;
@@ -111,12 +161,15 @@ void segfault_handler(pid_t pid, char* filepath){
       min = (void*) (uintptr_t) min_addr;
       max = (void*) (uintptr_t) max_addr;
 
-         
+         // if the memory address that triggered the segfault
+         // lies within 'cur's memory bracket, then break
       if(data.si_addr >= min && data.si_addr <= max){
         break; 
       }
       cur = cur->next;
     }
+
+    // Next, we report the permissions of 'cur's memory bracket
     printf("The permissions of the memory you tried to access are: '");
     if(cur->data->read_bit){
       printf("r");
@@ -137,7 +190,10 @@ void segfault_handler(pid_t pid, char* filepath){
     printf("'. Look at line %d to see what you did.\n", get_line(filepath, (regs.rip & 0x000000000FFF)));
   }
 
+  // Kill child process
   kill(pid, SIGKILL);
+
+  // Exit the program
   exit(1);
 }
 
