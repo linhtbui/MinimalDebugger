@@ -325,6 +325,7 @@ int resume_from_breakpoint(pid_t pid, debug_breakpoint_t* bp, char* filepath)
       ptrace(PTRACE_GETSIGINFO, pid, 0, &data) ;
       if (data.si_signo == SIGSEGV){
         printf("It has stopped because of a segmentation fault\n");
+        // call the segfault handler
         segfault_handler(pid, filepath);
       }
     }
